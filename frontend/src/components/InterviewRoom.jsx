@@ -3,6 +3,80 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const INTERVIEW_DURATION = 10 * 60 * 1000
 
+function ConfirmationModal({ onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md mx-4">
+        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h3 className="text-xl font-bold text-gray-900 text-center mb-2">End Interview Early?</h3>
+        <p className="text-gray-600 text-center mb-6">
+          Ending the interview will impact your overall score. Are you sure you want to end the interview now?
+        </p>
+        <div className="flex gap-4">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+          >
+            NO, Continue
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 px-6 py-3 bg-red-500 text-white font-semibold rounded-xl hover:bg-red-600 transition-colors"
+          >
+            YES, End Interview
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ScoreBar({ label, score, maxScore = 10 }) {
+  const percentage = (score / maxScore) * 100
+  const getColorClass = (score) => {
+    if (score >= 8) return 'bg-green-500'
+    if (score >= 6) return 'bg-cuegreen-500'
+    if (score >= 4) return 'bg-amber-500'
+    return 'bg-red-500'
+  }
+  const getBgClass = (score) => {
+    if (score >= 8) return 'bg-green-50 border-green-200'
+    if (score >= 6) return 'bg-cuegreen-50 border-cuegreen-200'
+    if (score >= 4) return 'bg-amber-50 border-amber-200'
+    return 'bg-red-50 border-red-200'
+  }
+
+  return (
+    <div className={`rounded-xl p-4 border ${getBgClass(score)}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-semibold text-gray-800">{label}</span>
+        <span className="text-lg font-bold text-gray-900">{score}/{maxScore}</span>
+      </div>
+      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          className={`h-full ${getColorClass(score)} transition-all duration-500`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function RecommendationBadge({ recommendation }) {
+  const rec = recommendation || ''
+  if (rec.includes('Strong') || rec.includes('Hire')) {
+    return <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">Recommended</span>
+  }
+  if (rec.includes('Reject')) {
+    return <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">Not Recommended</span>
+  }
+  return <span className="px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-700">Needs Improvement</span>
+}
+
 export default function InterviewRoom() {
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -15,6 +89,7 @@ export default function InterviewRoom() {
   const [conversationHistory, setConversationHistory] = useState([])
   const [interviewStarted, setInterviewStarted] = useState(false)
   const [interviewEnded, setInterviewEnded] = useState(false)
+  const [showEndConfirm, setShowEndConfirm] = useState(false)
 
   const recognitionRef = useRef(null)
   const silenceTimerRef = useRef(null)
@@ -40,7 +115,6 @@ export default function InterviewRoom() {
 
   const sendForProcessing = async (transcription) => {
     if (!transcription.trim()) return
-
     setIsProcessing(true)
     setCurrentAriaText('')
     ariaTextRef.current = ''
@@ -96,7 +170,6 @@ export default function InterviewRoom() {
 
   const startRecording = useCallback(() => {
     if (isRecording || isProcessing) return
-
     clearTimeout(silenceTimerRef.current)
     finalTranscriptRef.current = ''
 
@@ -116,9 +189,7 @@ export default function InterviewRoom() {
         if (event.results[i].isFinal) {
           finalTranscriptRef.current += event.results[i][0].transcript + ' '
           clearTimeout(silenceTimerRef.current)
-          silenceTimerRef.current = setTimeout(() => {
-            recognition.stop()
-          }, 5000)
+          silenceTimerRef.current = setTimeout(() => recognition.stop(), 5000)
         }
       }
     }
@@ -135,20 +206,15 @@ export default function InterviewRoom() {
       clearTimeout(silenceTimerRef.current)
       setIsRecording(false)
       const text = finalTranscriptRef.current.trim()
-      if (text) {
-        sendForProcessing(text)
-      }
+      if (text) sendForProcessing(text)
     }
 
     recognitionRef.current = recognition
     recognition.start()
     setIsRecording(true)
+    silenceTimerRef.current = setTimeout(() => recognition.stop(), 30000)
 
-    silenceTimerRef.current = setTimeout(() => {
-      recognition.stop()
-    }, 30000)
-
-  }, [isRecording, isProcessing, sendForProcessing])
+  }, [isRecording, isProcessing])
 
   const stopRecording = useCallback(() => {
     clearTimeout(silenceTimerRef.current)
@@ -171,9 +237,11 @@ export default function InterviewRoom() {
     setInterviewEnded(false)
     introSpokenRef.current = false
 
-    // Aria introduces herself after a brief pause
     setTimeout(() => {
-      const introMessage = { role: 'assistant', content: "Hi! I'm Aria from Cuemath. Thanks for joining — this will be a short, friendly conversation about your teaching approach. I'll ask a few questions, and there's no right or wrong answer. Ready to begin?" }
+      const introMessage = {
+        role: 'assistant',
+        content: "Hi, I'm Aria from Cuemath HR. Thanks for joining this screening interview. We'll have a friendly 10-minute conversation about your teaching style — there's no right or wrong answer, just honest responses. Take 40 seconds to 1.5 minutes per answer. Ready?"
+      }
       setCurrentAriaText(introMessage.content)
       setMessages([introMessage])
       setConversationHistory([introMessage])
@@ -190,7 +258,12 @@ export default function InterviewRoom() {
     setIsSpeaking(false)
     setInterviewActive(false)
     setInterviewEnded(true)
+    setShowEndConfirm(false)
   }, [])
+
+  const handleEndEarly = () => {
+    setShowEndConfirm(true)
+  }
 
   useEffect(() => {
     if (!interviewActive || showEvaluation) return
@@ -230,7 +303,7 @@ export default function InterviewRoom() {
     }
   }
 
-  const EvaluationPanel = () => {
+  function EvaluationPanel() {
     const [evaluation, setEvaluation] = useState(null)
     const [loading, setLoading] = useState(true)
 
@@ -241,14 +314,11 @@ export default function InterviewRoom() {
       })
     }, [])
 
-    // Parse evaluation if it's JSON
     let parsedEvaluation = null
     if (evaluation) {
       try {
         const jsonMatch = evaluation.match(/\{[\s\S]*\}/)
-        if (jsonMatch) {
-          parsedEvaluation = JSON.parse(jsonMatch[0])
-        }
+        if (jsonMatch) parsedEvaluation = JSON.parse(jsonMatch[0])
       } catch (e) {}
     }
 
@@ -261,7 +331,7 @@ export default function InterviewRoom() {
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Interview Complete</h2>
-          <p className="text-gray-500 mt-2">Here's your assessment</p>
+          <p className="text-gray-500 mt-2">Your Assessment Report</p>
         </div>
 
         {loading ? (
@@ -271,68 +341,69 @@ export default function InterviewRoom() {
           </div>
         ) : parsedEvaluation ? (
           <div className="space-y-6">
-            {/* Overall Recommendation */}
-            <div className={`p-4 rounded-xl ${
-              parsedEvaluation.overallRecommendation?.includes('Strong yes') || parsedEvaluation.overallRecommendation?.includes('Strong'))
-                ? 'bg-green-50 border border-green-200'
-                : parsedEvaluation.overallRecommendation?.includes('No') || parsedEvaluation.overallRecommendation?.includes('Strong no')
-                  ? 'bg-red-50 border border-red-200'
-                  : 'bg-amber-50 border border-amber-200'
-            }`}>
-              <p className="text-sm font-medium text-gray-500 mb-1">Overall Recommendation</p>
-              <p className="text-lg font-bold text-gray-900">{parsedEvaluation.overallRecommendation || 'N/A'}</p>
-              {parsedEvaluation.summary && <p className="text-sm text-gray-600 mt-2">{parsedEvaluation.summary}</p>}
+            {/* Overall Score */}
+            <div className="p-6 rounded-xl bg-gradient-to-r from-cuegreen-50 to-cuegreen-100 border border-cuegreen-200">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-gray-600">Overall Score</p>
+                <RecommendationBadge recommendation={parsedEvaluation.overallRecommendation} />
+              </div>
+              <div className="text-center">
+                <span className="text-5xl font-bold text-cuegreen-700">{parsedEvaluation.overallScore || '?'}/50</span>
+              </div>
+              {parsedEvaluation.overallRecommendation && (
+                <p className="text-center font-semibold text-gray-800 mt-3">{parsedEvaluation.overallRecommendation}</p>
+              )}
             </div>
 
-            {/* Dimension Ratings */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { key: 'communicationClarity', label: 'Communication Clarity', icon: '💬' },
-                { key: 'patience', label: 'Patience', icon: '🧘' },
-                { key: 'simplicity', label: 'Simplicity', icon: '🎯' },
-                { key: 'warmth', label: 'Warmth', icon: '☀️' },
-                { key: 'englishFluency', label: 'English Fluency', icon: '🗣️' },
-              ].map(dim => {
-                const data = parsedEvaluation[dim.key]
-                if (!data) return null
-                const ratingColors = {
-                  'Strong': 'bg-green-100 text-green-700',
-                  'Adequate': 'bg-amber-100 text-amber-700',
-                  'Needs Improvement': 'bg-red-100 text-red-700'
-                }
-                const ratingColor = data.rating ? ratingColors[data.rating] || 'bg-gray-100 text-gray-700' : 'bg-gray-100 text-gray-700'
-                return (
-                  <div key={dim.key} className="bg-gray-50 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-lg">{dim.icon}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${ratingColor}`}>
-                        {data.rating || 'N/A'}
-                      </span>
-                    </div>
-                    <p className="font-medium text-gray-700 text-sm mb-1">{dim.label}</p>
-                    {data.evidence && (
-                      <p className="text-xs text-gray-500 italic">"{data.evidence.slice(0, 100)}..."</p>
-                    )}
-                  </div>
-                )
-              })}
+            {/* Dimension Scores */}
+            <div className="space-y-3">
+              <p className="font-semibold text-gray-700">Dimension-wise Assessment</p>
+              <ScoreBar label="Communication Clarity" score={parsedEvaluation.communicationClarity?.score || 0} />
+              <ScoreBar label="Simplicity & Pedagogical Skill" score={parsedEvaluation.simplicity?.score || 0} />
+              <ScoreBar label="Patience & Temperament" score={parsedEvaluation.patience?.score || 0} />
+              <ScoreBar label="Warmth & Encouragement" score={parsedEvaluation.warmth?.score || 0} />
+              <ScoreBar label="English Fluency & Demeanor" score={parsedEvaluation.englishFluency?.score || 0} />
+            </div>
+
+            {/* Evidence */}
+            <div className="space-y-3">
+              {parsedEvaluation.communicationClarity?.evidence && (
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-500 mb-1">Communication Quote:</p>
+                  <p className="text-sm text-gray-700 italic">"{parsedEvaluation.communicationClarity.evidence}"</p>
+                </div>
+              )}
+              {parsedEvaluation.simplicity?.evidence && (
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-500 mb-1">Simplicity Quote:</p>
+                  <p className="text-sm text-gray-700 italic">"{parsedEvaluation.simplicity.evidence}"</p>
+                </div>
+              )}
             </div>
 
             {/* Strengths & Areas */}
             {parsedEvaluation.strengths?.length > 0 && (
-              <div>
-                <p className="font-medium text-gray-700 mb-2">Strengths</p>
-                <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+              <div className="bg-green-50 rounded-xl p-4">
+                <p className="font-semibold text-green-800 mb-2">Strengths</p>
+                <ul className="list-disc list-inside text-sm text-green-700 space-y-1">
                   {parsedEvaluation.strengths.map((s, i) => <li key={i}>{s}</li>)}
                 </ul>
               </div>
             )}
             {parsedEvaluation.areasForImprovement?.length > 0 && (
-              <div>
-                <p className="font-medium text-gray-700 mb-2">Areas for Improvement</p>
-                <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+              <div className="bg-amber-50 rounded-xl p-4">
+                <p className="font-semibold text-amber-800 mb-2">Areas for Improvement</p>
+                <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
                   {parsedEvaluation.areasForImprovement.map((a, i) => <li key={i}>{a}</li>)}
                 </ul>
+              </div>
+            )}
+
+            {/* Honest Assessment */}
+            {parsedEvaluation.honestAssessment && (
+              <div className="bg-gray-100 rounded-xl p-4">
+                <p className="font-semibold text-gray-800 mb-2">Overall Assessment</p>
+                <p className="text-sm text-gray-700">{parsedEvaluation.honestAssessment}</p>
               </div>
             )}
           </div>
@@ -356,7 +427,6 @@ export default function InterviewRoom() {
     const browserSupported = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-cuegreen-50 via-white to-cuegreen-50">
-        {/* Header */}
         <header className="bg-white/80 backdrop-blur-sm py-4 px-6 border-b border-gray-100">
           <div className="max-w-4xl mx-auto flex items-center gap-3">
             <div className="w-10 h-10 bg-cuegreen-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -371,7 +441,6 @@ export default function InterviewRoom() {
           </div>
         </header>
 
-        {/* Hero Section */}
         <main className="flex-1 flex flex-col items-center justify-center p-6">
           <div className="max-w-lg w-full text-center mb-8">
             <div className="w-24 h-24 bg-gradient-to-br from-cuegreen-400 to-cuegreen-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
@@ -380,22 +449,19 @@ export default function InterviewRoom() {
               </svg>
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-3">AI Tutor Screening</h2>
-            <p className="text-gray-600 mb-8">
-              A quick 5-7 minute conversation to learn about your teaching approach. No preparation needed!
-            </p>
+            <p className="text-gray-600 mb-8">A 10-minute interview assessing your teaching approach. Answer honestly and naturally.</p>
 
-            {/* What's assessed */}
             <div className="bg-white rounded-2xl shadow-lg p-6 text-left mb-8">
-              <p className="text-sm font-semibold text-gray-900 mb-4">What we're looking for:</p>
-              <div className="grid grid-cols-2 gap-3">
+              <p className="text-sm font-semibold text-gray-900 mb-4">What we assess (out of 10 each):</p>
+              <div className="grid grid-cols-1 gap-3">
                 {[
-                  { label: 'Communication', icon: '💬' },
-                  { label: 'Patience', icon: '🧘' },
-                  { label: 'Simplicity', icon: '🎯' },
-                  { label: 'Warmth', icon: '☀️' },
-                  { label: 'English', icon: '🗣️' },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2">
+                  { label: 'Communication Clarity', icon: '💬' },
+                  { label: 'Simplicity & Pedagogical Skill', icon: '🎯' },
+                  { label: 'Patience & Temperament', icon: '🧘' },
+                  { label: 'Warmth & Encouragement', icon: '☀️' },
+                  { label: 'English Fluency & Demeanor', icon: '🗣️' },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3">
                     <span>{item.icon}</span>
                     <span className="text-sm font-medium text-gray-700">{item.label}</span>
                   </div>
@@ -403,14 +469,13 @@ export default function InterviewRoom() {
               </div>
             </div>
 
-            {/* Instructions */}
             <div className="bg-cuegreen-50 rounded-2xl p-4 text-left mb-8">
               <p className="text-sm font-medium text-cuegreen-800 mb-2">How it works:</p>
               <ul className="text-sm text-cuegreen-700 space-y-1">
-                <li>✓ Tap the microphone and speak</li>
-                <li>✓ Wait 5 seconds of silence to auto-send</li>
-                <li>✓ Aria will respond and ask follow-up questions</li>
-                <li>✓ Interview lasts up to 10 minutes</li>
+                <li>✓ 10-minute voice interview with Aria</li>
+                <li>✓ Tap mic to speak, auto-sends after 5s silence</li>
+                <li>✓ Answer in 40 sec to 1.5 min per question</li>
+                <li>✓ 7-10 questions, honest assessment at end</li>
               </ul>
             </div>
 
@@ -428,9 +493,7 @@ export default function InterviewRoom() {
               Start Interview
             </button>
 
-            <p className="text-xs text-gray-400 mt-4">
-              Your responses are used only for evaluation purposes
-            </p>
+            <p className="text-xs text-gray-400 mt-4">Your responses are used only for evaluation purposes</p>
           </div>
         </main>
       </div>
@@ -439,7 +502,13 @@ export default function InterviewRoom() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-white">
-      {/* Header */}
+      {showEndConfirm && (
+        <ConfirmationModal
+          onConfirm={endInterview}
+          onCancel={() => setShowEndConfirm(false)}
+        />
+      )}
+
       <header className="bg-white shadow-sm py-4 px-6">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -450,7 +519,7 @@ export default function InterviewRoom() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">Interview Room</h1>
-              <p className="text-sm text-gray-500">Aria - AI Interviewer</p>
+              <p className="text-sm text-gray-500">Aria - HR Interviewer</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -459,8 +528,8 @@ export default function InterviewRoom() {
             </div>
             {interviewActive && (
               <button
-                onClick={endInterview}
-                className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                onClick={handleEndEarly}
+                className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
               >
                 End Early
               </button>
@@ -469,13 +538,11 @@ export default function InterviewRoom() {
         </div>
       </header>
 
-      {/* Main */}
       <main className="flex-1 flex flex-col items-center justify-center p-6">
         {showEvaluation || interviewEnded ? (
           <EvaluationPanel />
         ) : (
           <div className="w-full max-w-2xl">
-            {/* Status */}
             <div className="text-center mb-6">
               <div className={`inline-flex items-center gap-3 px-6 py-3 rounded-full ${
                 isRecording ? 'bg-red-100 text-red-700' :
@@ -505,14 +572,12 @@ export default function InterviewRoom() {
                   {isRecording ? 'Listening...' :
                    isProcessing ? 'Aria is thinking...' :
                    isSpeaking ? 'Aria speaking...' :
-                   'Tap to speak'}
+                   'Ready to speak'}
                 </span>
               </div>
             </div>
 
-            {/* Conversation Card */}
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-              {/* Aria's response area */}
               <div className="p-6 min-h-[200px]">
                 <div className="flex gap-4 mb-4">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
@@ -530,12 +595,11 @@ export default function InterviewRoom() {
                 </div>
               </div>
 
-              {/* Mic Button */}
               <div className="bg-gradient-to-r from-gray-50 to-white border-t p-6">
                 <div className="flex justify-center">
                   <button
                     onClick={isRecording ? stopRecording : startRecording}
-                    disabled={isProcessing || (interviewActive && messages.length === 0 && !introSpokenRef.current)}
+                    disabled={isProcessing}
                     className={`w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-lg ${
                       isProcessing ? 'bg-gray-400 cursor-not-allowed' :
                       isRecording
@@ -560,7 +624,6 @@ export default function InterviewRoom() {
               </div>
             </div>
 
-            {/* Conversation History */}
             {messages.length > 1 && (
               <div className="mt-6 p-4 bg-white/50 rounded-xl">
                 <p className="text-xs text-gray-400 mb-2">{messages.length - 1} exchanges completed</p>
@@ -570,11 +633,8 @@ export default function InterviewRoom() {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="bg-white border-t py-3 px-6">
-        <p className="text-center text-xs text-gray-400">
-          Cuemath AI Tutor Screener • Voice Interview
-        </p>
+        <p className="text-center text-xs text-gray-400">Cuemath AI Tutor Screener • 10 Minute Interview</p>
       </footer>
     </div>
   )
