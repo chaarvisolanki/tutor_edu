@@ -189,7 +189,7 @@ export default function InterviewRoom() {
         if (event.results[i].isFinal) {
           finalTranscriptRef.current += event.results[i][0].transcript + ' '
           clearTimeout(silenceTimerRef.current)
-          silenceTimerRef.current = setTimeout(() => recognition.stop(), 5000)
+          silenceTimerRef.current = setTimeout(() => recognition.stop(), 10000)
         }
       }
     }
