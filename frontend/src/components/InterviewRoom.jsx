@@ -89,6 +89,7 @@ export default function InterviewRoom() {
   const [conversationHistory, setConversationHistory] = useState([])
   const [interviewStarted, setInterviewStarted] = useState(false)
   const [interviewEnded, setInterviewEnded] = useState(false)
+  const [interviewIncomplete, setInterviewIncomplete] = useState(false)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
 
   const recognitionRef = useRef(null)
@@ -235,6 +236,7 @@ export default function InterviewRoom() {
     ariaTextRef.current = ''
     setShowEvaluation(false)
     setInterviewEnded(false)
+    setInterviewIncomplete(false)
     introSpokenRef.current = false
 
     setTimeout(() => {
@@ -263,6 +265,18 @@ export default function InterviewRoom() {
 
   const handleEndEarly = () => {
     setShowEndConfirm(true)
+  }
+
+  const handleEndEarlyConfirm = () => {
+    setInterviewIncomplete(true)
+    clearTimeout(silenceTimerRef.current)
+    if (recognitionRef.current) recognitionRef.current.stop()
+    window.speechSynthesis.cancel()
+    setIsRecording(false)
+    setIsSpeaking(false)
+    setInterviewActive(false)
+    setShowEvaluation(true)
+    setShowEndConfirm(false)
   }
 
   useEffect(() => {
@@ -303,7 +317,7 @@ export default function InterviewRoom() {
     }
   }
 
-  function EvaluationPanel() {
+  function EvaluationPanel({ isIncomplete }) {
     const [evaluation, setEvaluation] = useState(null)
     const [loading, setLoading] = useState(true)
 
@@ -333,6 +347,12 @@ export default function InterviewRoom() {
           <h2 className="text-2xl font-bold text-gray-900">Interview Complete</h2>
           <p className="text-gray-500 mt-2">Your Assessment Report</p>
         </div>
+
+        {isIncomplete && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
+            <p className="text-amber-800 font-medium">You didn't complete the assessment to get evaluated.</p>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -504,7 +524,7 @@ export default function InterviewRoom() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-white">
       {showEndConfirm && (
         <ConfirmationModal
-          onConfirm={endInterview}
+          onConfirm={handleEndEarlyConfirm}
           onCancel={() => setShowEndConfirm(false)}
         />
       )}
@@ -540,7 +560,7 @@ export default function InterviewRoom() {
 
       <main className="flex-1 flex flex-col items-center justify-center p-6">
         {showEvaluation || interviewEnded ? (
-          <EvaluationPanel />
+          <EvaluationPanel isIncomplete={interviewIncomplete} />
         ) : (
           <div className="w-full max-w-2xl">
             <div className="text-center mb-6">
