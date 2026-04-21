@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const INTERVIEW_DURATION = 10 * 60 * 1000
 
 function ConfirmationModal({ onConfirm, onCancel }) {
@@ -257,7 +257,7 @@ export default function InterviewRoom() {
     setIsRecording(false)
     setIsSpeaking(false)
     setInterviewActive(false)
-    setInterviewEnded(true)
+    setShowEvaluation(true)
     setShowEndConfirm(false)
   }, [])
 

@@ -189,7 +189,7 @@ app.post('/api/evaluate', async (req, res) => {
       messages: [
         {
           role: 'system',
-          content: systemPrompt + "\n\nBased on the conversation above, provide a structured evaluation of the candidate with specific quotes as evidence for each dimension. Format as JSON with: communicationClarity, patience, simplicity, warmth, englishFluency, overallRecommendation, strengths, areasForImprovement."
+          content: systemPrompt + "\n\nBased on the conversation above, provide a structured evaluation of the candidate with specific quotes as evidence for each dimension. Format as JSON with: communicationClarity, simplicity, patience, warmth, englishFluency, overallScore, overallRecommendation, strengths, areasForImprovement, honestAssessment, suggestion."
         },
         ...conversationHistory.map(h => ({
           role: h.role === 'assistant' ? 'assistant' : 'user',
