@@ -90,6 +90,7 @@ export default function InterviewRoom() {
   const [interviewStarted, setInterviewStarted] = useState(false)
   const [interviewEnded, setInterviewEnded] = useState(false)
   const [interviewIncomplete, setInterviewIncomplete] = useState(false)
+  const conversationEndedRef = useRef(false)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
 
   const recognitionRef = useRef(null)
@@ -109,8 +110,18 @@ export default function InterviewRoom() {
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.rate = 0.95
     utterance.onstart = () => setIsSpeaking(true)
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = () => setIsSpeaking(false)
+    utterance.onend = () => {
+      setIsSpeaking(false)
+      if (conversationEndedRef.current) {
+        setShowEvaluation(true)
+      }
+    }
+    utterance.onerror = () => {
+      setIsSpeaking(false)
+      if (conversationEndedRef.current) {
+        setShowEvaluation(true)
+      }
+    }
     window.speechSynthesis.speak(utterance)
   }, [])
 
@@ -237,6 +248,7 @@ export default function InterviewRoom() {
     setShowEvaluation(false)
     setInterviewEnded(false)
     setInterviewIncomplete(false)
+    conversationEndedRef.current = false
     introSpokenRef.current = false
 
     setTimeout(() => {
@@ -259,7 +271,7 @@ export default function InterviewRoom() {
     setIsRecording(false)
     setIsSpeaking(false)
     setInterviewActive(false)
-    setShowEvaluation(true)
+    conversationEndedRef.current = true
     setShowEndConfirm(false)
   }, [])
 
@@ -278,6 +290,10 @@ export default function InterviewRoom() {
     setShowEvaluation(true)
     setShowEndConfirm(false)
   }
+
+  const handleEndEarlyCancel = useCallback(() => {
+    setShowEndConfirm(false)
+  }, [])
 
   useEffect(() => {
     if (!interviewActive || showEvaluation) return
@@ -525,7 +541,7 @@ export default function InterviewRoom() {
       {showEndConfirm && (
         <ConfirmationModal
           onConfirm={handleEndEarlyConfirm}
-          onCancel={() => setShowEndConfirm(false)}
+          onCancel={handleEndEarlyCancel}
         />
       )}
 
